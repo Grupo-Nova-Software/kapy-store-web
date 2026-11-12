@@ -28,6 +28,13 @@ export interface Category {
   sortOrder: number; // int DEFAULT 0
 }
 
+/** One size of one color with its own stock (`product_variants.size_stocks[]`). */
+export interface SizeStock {
+  /** "40", "M"… or "Único" for products without sizes. */
+  size: string;
+  stock: number;
+}
+
 /** Table `product_variants` — one row per color of a product. */
 export interface ProductVariant {
   id: Id; // uuid PK
@@ -39,6 +46,9 @@ export interface ProductVariant {
   imageUrl: string; // text NOT NULL
   /** Extra photos for the gallery, main photo excluded. */
   gallery: string[]; // text[] DEFAULT '{}'
+  /** Sizes offered in this color, in display order, each with its stock. */
+  sizeStocks: SizeStock[]; // jsonb DEFAULT '[]'
+  /** Total units of this color (sum of `sizeStocks`, kept by a DB trigger). */
   stock: number; // int NOT NULL CHECK (stock >= 0)
   /** Overrides the product price for this variant when set. */
   priceOverride: Guaranies | null; // integer NULL
@@ -57,12 +67,6 @@ export interface Product {
   /** Previous price, shown struck through when > price. */
   compareAtPrice: Guaranies | null; // integer NULL
   badge: string | null; // text NULL — "Nuevo", "Top ventas"…
-  /**
-   * Available sizes, in display order (`text[] DEFAULT '{}'`).
-   * Empty / undefined → one size ("Único"): headphones, accessories.
-   * Stock is tracked per color and shared across sizes.
-   */
-  sizes?: string[];
   isActive: boolean; // bool DEFAULT true
   sortOrder: number; // int DEFAULT 0
   createdAt: Timestamp; // timestamptz DEFAULT now()
@@ -77,14 +81,14 @@ export interface CartItem {
   key: string;
   productId: Id;
   variantId: Id;
-  /** Chosen size, or `null` for one-size products. */
-  size: string | null;
+  /** Chosen size ("Único" for one-size products). */
+  size: string;
   name: string;
   colorName: string;
   hexColor: string;
   imageUrl: string;
   unitPrice: Guaranies;
   quantity: number;
-  /** Color stock when added; caps the sum of all sizes of this variant. */
+  /** Stock of this exact color + size when added; caps the line quantity. */
   maxStock: number;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Footprints, Headphones, LayoutGrid, Tag, Watch, type LucideIcon } from "lucide-react";
+import { Footprints, Headphones, LayoutGrid, Shirt, Tag, Watch, type LucideIcon } from "lucide-react";
 import type { Category, CategorySlug } from "@/types/store";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +11,7 @@ const ICONS: Partial<Record<CategoryFilterValue, LucideIcon>> = {
   calzados: Footprints,
   auriculares: Headphones,
   accesorios: Watch,
+  ropa: Shirt,
 };
 
 interface CategoryFilterProps {

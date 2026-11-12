@@ -8,8 +8,8 @@ interface CartState {
   items: CartItem[];
   isOpen: boolean;
   /**
-   * Adds `quantity` units of a color + size. Stock is per color, so the cap is
-   * shared by every size line of the same variant. Returns the units added.
+   * Adds `quantity` units of a color + size. Stock is tracked per color + size,
+   * so each line is capped by its own `maxStock`. Returns the units added.
    */
   addItem: (item: Omit<CartItem, "quantity">, quantity?: number) => number;
   increment: (key: string) => void;
@@ -20,9 +20,9 @@ interface CartState {
   closeCart: () => void;
 }
 
-/** Units of a variant (all sizes) already in the cart. */
-export function variantQuantity(items: CartItem[], variantId: string): number {
-  return items.reduce((sum, i) => (i.variantId === variantId ? sum + i.quantity : sum), 0);
+/** Units of a cart line (one color + size) already in the cart. */
+export function lineQuantity(items: CartItem[], key: string): number {
+  return items.find((i) => i.key === key)?.quantity ?? 0;
 }
 
 export const useCartStore = create<CartState>()(
@@ -33,7 +33,7 @@ export const useCartStore = create<CartState>()(
 
       addItem: (item, quantity = 1) => {
         const { items } = get();
-        const remaining = item.maxStock - variantQuantity(items, item.variantId);
+        const remaining = item.maxStock - lineQuantity(items, item.key);
         const added = Math.min(quantity, remaining);
         if (added <= 0) return 0;
 
@@ -51,7 +51,7 @@ export const useCartStore = create<CartState>()(
       increment: (key) =>
         set((state) => {
           const line = state.items.find((i) => i.key === key);
-          if (!line || variantQuantity(state.items, line.variantId) >= line.maxStock) return state;
+          if (!line || line.quantity >= line.maxStock) return state;
           return {
             items: state.items.map((i) => (i.key === key ? { ...i, quantity: i.quantity + 1 } : i)),
           };
@@ -73,8 +73,8 @@ export const useCartStore = create<CartState>()(
     }),
     {
       name: "kapy-cart",
-      // v2: sizes + Supabase UUIDs. Older carts point to mock IDs → discard them.
-      version: 2,
+      // v3: stock per color + size. Older carts carry per-color caps → discard them.
+      version: 3,
       migrate: () => ({ items: [] }),
       // Browser-only: on the server this throws and persist stays inert.
       storage: createJSONStorage(() => {
@@ -96,5 +96,5 @@ export const selectCount = (s: CartState) =>
 export const selectTotal = (s: CartState) =>
   s.items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
 
-export const selectVariantQuantity = (variantId: string) => (s: CartState) =>
-  variantQuantity(s.items, variantId);
+export const selectLineQuantity = (key: string) => (s: CartState) =>
+  lineQuantity(s.items, key);

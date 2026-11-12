@@ -4,16 +4,17 @@ import { useState } from "react";
 import Image from "next/image";
 import { Plus, X } from "lucide-react";
 import type { Product, ProductVariant } from "@/types/store";
+import { cartKey, cn, defaultVariant, formatGs, variantPrice } from "@/lib/utils";
 import {
-  cartKey,
-  cn,
-  defaultVariant,
-  formatGs,
-  hasSizes,
-  sizeRange,
-  variantPrice,
-} from "@/lib/utils";
-import { selectVariantQuantity, useCartStore } from "@/store/cart-store";
+  isOneSizeVariant,
+  isProductSoldOut,
+  ONE_SIZE_LABEL,
+  productHasSizes,
+  productSizesInStock,
+  sizeRangeLabel,
+  sizeStockOf,
+} from "@/lib/inventory";
+import { lineQuantity, useCartStore } from "@/store/cart-store";
 import { ColorSwatches } from "@/components/catalog/color-swatches";
 import { SizeSelector } from "@/components/catalog/size-selector";
 import { StockLabel } from "@/components/catalog/stock-label";
@@ -34,20 +35,26 @@ export function ProductCard({ product, priority, onOpen }: ProductCardProps) {
   const [pickingSize, setPickingSize] = useState(false);
   const addItem = useCartStore((s) => s.addItem);
   const openCart = useCartStore((s) => s.openCart);
-  const inCart = useCartStore(selectVariantQuantity(active.id));
+  const cartItems = useCartStore((s) => s.items);
 
-  const sizes = product.sizes ?? [];
-  const needsSize = hasSizes(product);
+  const needsSize = !isOneSizeVariant(active);
+  /** Sizes of the active color, minus what is already in the cart. */
+  const sizeOptions = active.sizeStocks.map(({ size, stock }) => ({
+    size,
+    stock: stock - lineQuantity(cartItems, cartKey(product.id, active.id, size)),
+  }));
+  const soldOut = isProductSoldOut(product);
+  const sizesInStock = productSizesInStock(product);
   const shown = preview ?? active;
   const secondary = shown.gallery[0];
   const price = variantPrice(product, active);
-  const canQuickAdd = active.stock - inCart > 0;
+  const canQuickAdd = sizeOptions.some((o) => o.stock > 0);
   const discount =
     product.compareAtPrice && product.compareAtPrice > price
       ? Math.round((1 - price / product.compareAtPrice) * 100)
       : 0;
 
-  const add = (size: string | null) => {
+  const add = (size: string) => {
     const added = addItem({
       key: cartKey(product.id, active.id, size),
       productId: product.id,
@@ -58,7 +65,7 @@ export function ProductCard({ product, priority, onOpen }: ProductCardProps) {
       hexColor: active.hexColor,
       imageUrl: active.imageUrl,
       unitPrice: price,
-      maxStock: active.stock,
+      maxStock: sizeStockOf(active, size),
     });
     setPickingSize(false);
     if (added) openCart();
@@ -87,6 +94,7 @@ export function ProductCard({ product, priority, onOpen }: ProductCardProps) {
           className={cn(
             "animate-fade-in object-cover transition duration-500 group-hover/media:scale-105",
             secondary && "group-hover/media:opacity-0",
+            soldOut && "opacity-60 grayscale-[60%]",
           )}
         />
         {secondary && (
@@ -111,7 +119,12 @@ export function ProductCard({ product, priority, onOpen }: ProductCardProps) {
             </span>
           )}
         </div>
-        {active.stock === 0 && !preview && (
+        {soldOut && (
+          <span className="absolute top-2.5 right-2.5 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-bold tracking-wider text-zinc-600 uppercase ring-1 ring-zinc-200 backdrop-blur dark:bg-zinc-900/90 dark:text-zinc-300 dark:ring-zinc-700">
+            Agotado
+          </span>
+        )}
+        {!soldOut && active.stock === 0 && !preview && (
           <span className="absolute inset-x-0 bottom-0 bg-zinc-900/75 py-1.5 text-center text-xs font-semibold text-white backdrop-blur">
             Agotado en este color
           </span>
@@ -139,7 +152,11 @@ export function ProductCard({ product, priority, onOpen }: ProductCardProps) {
             {product.name}
           </h3>
           <p className="mt-0.5 text-[11px] text-zinc-500">
-            {needsSize ? `Talles ${sizeRange(sizes)}` : "Talle único"}
+            {!productHasSizes(product)
+              ? "Talle único"
+              : sizesInStock.length > 0
+                ? `Talles ${sizeRangeLabel(sizesInStock)}`
+                : "Sin talles disponibles"}
           </p>
         </button>
 
@@ -158,7 +175,9 @@ export function ProductCard({ product, priority, onOpen }: ProductCardProps) {
           </div>
           <button
             type="button"
-            onClick={() => (needsSize ? setPickingSize(true) : add(null))}
+            onClick={() =>
+              needsSize ? setPickingSize(true) : add(active.sizeStocks[0]?.size ?? ONE_SIZE_LABEL)
+            }
             disabled={!canQuickAdd}
             aria-label={`Agregar ${product.name} ${active.colorName} al carrito`}
             aria-expanded={needsSize ? pickingSize : undefined}
@@ -190,7 +209,7 @@ export function ProductCard({ product, priority, onOpen }: ProductCardProps) {
               <X className="size-4" />
             </button>
           </div>
-          <SizeSelector sizes={sizes} value={null} onChange={add} size="sm" />
+          <SizeSelector options={sizeOptions} value={null} onChange={add} size="sm" />
         </div>
       )}
     </article>

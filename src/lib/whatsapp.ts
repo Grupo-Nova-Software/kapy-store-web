@@ -1,4 +1,5 @@
-import { formatGs, ONE_SIZE_LABEL } from "@/lib/utils";
+import { formatGs } from "@/lib/utils";
+import { ONE_SIZE_LABEL } from "@/lib/inventory";
 import type { Guaranies } from "@/types/store";
 
 /** International format without "+" (595 = Paraguay). Configure in `.env.local`. */
@@ -8,7 +9,7 @@ export const WHATSAPP_NUMBER =
 export interface OrderLine {
   name: string;
   colorName: string;
-  /** `null` → one-size product, rendered as "Único". */
+  /** "Único" (or `null`) for one-size products. */
   size: string | null;
   quantity: number;
   unitPrice: Guaranies;

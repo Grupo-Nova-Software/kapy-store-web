@@ -4,9 +4,10 @@ import { useRef, useState, type MouseEvent } from "react";
 import Image from "next/image";
 import { ShoppingBag, Truck } from "lucide-react";
 import type { Product, ProductVariant } from "@/types/store";
-import { cartKey, cn, formatGs, hasSizes, variantPrice } from "@/lib/utils";
+import { cartKey, cn, formatGs, variantPrice } from "@/lib/utils";
+import { isOneSizeVariant, ONE_SIZE_LABEL, sizeStockOf } from "@/lib/inventory";
 import { orderToWhatsAppUrl } from "@/lib/whatsapp";
-import { selectVariantQuantity, useCartStore } from "@/store/cart-store";
+import { lineQuantity, useCartStore } from "@/store/cart-store";
 import { Sheet } from "@/components/ui/sheet";
 import { QuantityStepper } from "@/components/ui/quantity-stepper";
 import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
@@ -50,7 +51,7 @@ function ProductDetail({
   onClose: () => void;
 }) {
   const [variant, setVariant] = useState(initialVariant);
-  const [size, setSize] = useState<string | null>(null);
+  const [pickedSize, setPickedSize] = useState<string | null>(null);
   /** Times the user tried to continue without a size (re-triggers the shake). */
   const [missingSizeAttempts, setMissingSizeAttempts] = useState(0);
   const [photoIndex, setPhotoIndex] = useState(0);
@@ -59,20 +60,37 @@ function ProductDetail({
 
   const addItem = useCartStore((s) => s.addItem);
   const openCart = useCartStore((s) => s.openCart);
-  const inCart = useCartStore(selectVariantQuantity(variant.id));
+  const cartItems = useCartStore((s) => s.items);
 
-  const sizes = product.sizes ?? [];
-  const needsSize = hasSizes(product);
-  const sizeMissing = needsSize && size === null;
+  const needsSize = !isOneSizeVariant(variant);
+  /** Sizes offered in THIS color, minus the units already in the cart. */
+  const sizeOptions = variant.sizeStocks.map(({ size: s, stock }) => ({
+    size: s,
+    stock: Math.max(stock - lineQuantity(cartItems, cartKey(product.id, variant.id, s)), 0),
+  }));
+  const colorAvailable = sizeOptions.reduce((sum, o) => sum + o.stock, 0);
+  // One-size colors need no choice; a picked size that this color lacks is dropped.
+  const size = needsSize
+    ? sizeOptions.some((o) => o.size === pickedSize && o.stock > 0)
+      ? pickedSize
+      : null
+    : (variant.sizeStocks[0]?.size ?? ONE_SIZE_LABEL);
+  const sizeMissing = size === null;
   const photos = [variant.imageUrl, ...variant.gallery];
   const price = variantPrice(product, variant);
-  const available = Math.max(variant.stock - inCart, 0);
-  const qty = Math.min(quantity, Math.max(available, 1));
+  const inCart = size === null ? 0 : lineQuantity(cartItems, cartKey(product.id, variant.id, size));
+  const available = size === null ? colorAvailable : Math.max(sizeStockOf(variant, size) - inCart, 0);
+  const qty = size === null ? 1 : Math.min(quantity, Math.max(available, 1));
   const canBuy = available > 0;
 
   const selectVariant = (v: ProductVariant) => {
     setVariant(v);
     setPhotoIndex(0);
+    setQuantity(1);
+  };
+
+  const selectSize = (s: string) => {
+    setPickedSize(s);
     setQuantity(1);
   };
 
@@ -86,20 +104,19 @@ function ProductDetail({
   };
 
   const addToCart = () => {
-    if (!ensureSize()) return;
-    const chosenSize = needsSize ? size : null;
+    if (!ensureSize() || size === null) return;
     const added = addItem(
       {
-        key: cartKey(product.id, variant.id, chosenSize),
+        key: cartKey(product.id, variant.id, size),
         productId: product.id,
         variantId: variant.id,
-        size: chosenSize,
+        size,
         name: product.name,
         colorName: variant.colorName,
         hexColor: variant.hexColor,
         imageUrl: variant.imageUrl,
         unitPrice: price,
-        maxStock: variant.stock,
+        maxStock: sizeStockOf(variant, size),
       },
       qty,
     );
@@ -117,7 +134,7 @@ function ProductDetail({
     {
       name: product.name,
       colorName: variant.colorName,
-      size: needsSize ? size : null,
+      size,
       quantity: qty,
       unitPrice: price,
     },
@@ -181,7 +198,7 @@ function ProductDetail({
               <span className="text-zinc-500">Color: </span>
               <span className="font-semibold">{variant.colorName}</span>
             </p>
-            <StockLabel stock={variant.stock} />
+            <StockLabel stock={size === null ? variant.stock : sizeStockOf(variant, size)} />
           </div>
           <ColorSwatches
             variants={product.variants}
@@ -199,20 +216,27 @@ function ProductDetail({
                 {size ?? "Elegí uno"}
               </span>
             </p>
-            <SizeSelector
-              key={missingSizeAttempts}
-              ref={sizesRef}
-              sizes={sizes}
-              value={size}
-              onChange={setSize}
-              invalid={missingSizeAttempts > 0 && sizeMissing}
-              disabled={!canBuy}
-            />
+            {colorAvailable > 0 ? (
+              <SizeSelector
+                key={missingSizeAttempts}
+                ref={sizesRef}
+                options={sizeOptions}
+                value={size}
+                onChange={selectSize}
+                invalid={missingSizeAttempts > 0 && sizeMissing}
+              />
+            ) : (
+              <p className="rounded-2xl bg-zinc-100 px-4 py-3 text-sm text-zinc-500 dark:bg-zinc-800">
+                {variant.stock > 0
+                  ? "Ya tenés en tu carrito todo el stock de este color."
+                  : "Este color está agotado en todos los talles. Probá con otro color."}
+              </p>
+            )}
           </div>
         ) : (
           <p className="text-sm">
             <span className="text-zinc-500">Talle: </span>
-            <span className="font-semibold">Único</span>
+            <span className="font-semibold">{size}</span>
           </p>
         )}
 
@@ -220,8 +244,10 @@ function ProductDetail({
           <div>
             <p className="text-sm font-semibold">Cantidad</p>
             <p className="text-xs text-zinc-500">
-              {canBuy
-                ? `${available} disponible${available === 1 ? "" : "s"}${inCart ? ` · ${inCart} en tu carrito` : ""}`
+              {canBuy && size === null
+                ? "Elegí un talle para ver la disponibilidad"
+                : canBuy
+                ? `${available} disponible${available === 1 ? "" : "s"}${needsSize ? ` en talle ${size}` : ""}${inCart ? ` · ${inCart} en tu carrito` : ""}`
                 : inCart
                   ? "Ya tenés todo el stock en tu carrito"
                   : "Sin unidades disponibles"}
@@ -230,7 +256,7 @@ function ProductDetail({
           <QuantityStepper
             value={canBuy ? qty : 0}
             min={1}
-            max={available}
+            max={size === null ? 1 : available}
             onDecrement={() => setQuantity(Math.max(qty - 1, 1))}
             onIncrement={() => setQuantity(Math.min(qty + 1, available))}
           />

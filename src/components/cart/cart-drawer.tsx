@@ -3,9 +3,10 @@
 import { useEffect } from "react";
 import Image from "next/image";
 import { ShoppingBag, Trash2 } from "lucide-react";
-import { cn, formatGs, ONE_SIZE_LABEL } from "@/lib/utils";
+import { cn, formatGs } from "@/lib/utils";
+import { isOneSizeLabel } from "@/lib/inventory";
 import { orderToWhatsAppUrl } from "@/lib/whatsapp";
-import { selectCount, selectTotal, useCartStore, variantQuantity } from "@/store/cart-store";
+import { selectCount, selectTotal, useCartStore } from "@/store/cart-store";
 import { Sheet } from "@/components/ui/sheet";
 import { QuantityStepper } from "@/components/ui/quantity-stepper";
 import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
@@ -62,8 +63,8 @@ export function CartDrawer() {
         <>
           <ul className="flex-1 divide-y divide-zinc-100 overflow-y-auto px-5 dark:divide-zinc-800">
             {items.map((item) => {
-              // Stock is per color: every size line of the variant shares it.
-              const atMax = variantQuantity(items, item.variantId) >= item.maxStock;
+              // Stock is per color + size: each line has its own cap.
+              const atMax = item.quantity >= item.maxStock;
               return (
                 <li key={item.key} className="flex gap-3 py-4">
                   <div className="relative size-20 shrink-0 overflow-hidden rounded-2xl bg-zinc-100 dark:bg-zinc-800">
@@ -90,9 +91,11 @@ export function CartDrawer() {
                       {item.colorName}
                       <span aria-hidden>·</span>
                       <span
-                        className={cn(item.size && "font-semibold text-zinc-700 dark:text-zinc-300")}
+                        className={cn(
+                          !isOneSizeLabel(item.size) && "font-semibold text-zinc-700 dark:text-zinc-300",
+                        )}
                       >
-                        Talle {item.size ?? ONE_SIZE_LABEL}
+                        Talle {item.size}
                       </span>
                     </p>
                     <div className="mt-auto flex items-end justify-between gap-2 pt-2">

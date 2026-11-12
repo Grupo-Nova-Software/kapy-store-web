@@ -8,15 +8,18 @@
 
 type Timestamptz = string;
 
-export interface CategoryRow {
+// `type` (not `interface`) on purpose: supabase-js requires rows to be
+// assignable to Record<string, unknown>, which interfaces are not.
+
+export type CategoryRow = {
   id: string;
   name: string;
   slug: string;
   sort_order: number;
   created_at: Timestamptz;
-}
+};
 
-export interface ProductRow {
+export type ProductRow = {
   id: string;
   name: string;
   slug: string;
@@ -26,14 +29,18 @@ export interface ProductRow {
   price: number;
   compare_at_price: number | null;
   badge: string | null;
-  sizes: string[];
   is_active: boolean;
   sort_order: number;
   created_at: Timestamptz;
   updated_at: Timestamptz;
-}
+};
 
-export interface ProductVariantRow {
+export type SizeStockRow = {
+  size: string;
+  stock: number;
+};
+
+export type ProductVariantRow = {
   id: string;
   product_id: string;
   sku: string;
@@ -41,11 +48,14 @@ export interface ProductVariantRow {
   hex_color: string;
   image_url: string;
   gallery: string[];
+  /** jsonb `[{ size, stock }]` — validated by the `sync_variant_stock` trigger. */
+  size_stocks: SizeStockRow[];
+  /** Derived: sum of `size_stocks[].stock` (trigger). Read-only for the app. */
   stock: number;
   price_override: number | null;
   sort_order: number;
   created_at: Timestamptz;
-}
+};
 
 type WithDefaults<Row, Required extends keyof Row> = Pick<Row, Required> &
   Partial<Omit<Row, Required>>;
@@ -94,6 +104,10 @@ export interface Database {
     Views: { [_ in never]: never };
     Functions: {
       is_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
+      adjust_variant_stock: {
+        Args: { p_variant_id: string; p_size: string; p_delta: number };
+        Returns: number;
+      };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

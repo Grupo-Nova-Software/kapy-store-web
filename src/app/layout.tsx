@@ -1,7 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { SiteHeader } from "@/components/layout/site-header";
-import { CartDrawer } from "@/components/cart/cart-drawer";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -48,12 +46,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="flex min-h-full flex-col bg-zinc-50 font-sans text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
-        <SiteHeader />
         {children}
-        <footer className="border-t border-zinc-200 py-6 text-center text-xs text-zinc-500 dark:border-zinc-800">
-          © Kapy Store · Sneakers, audio y accesorios · Paraguay
-        </footer>
-        <CartDrawer />
       </body>
     </html>
   );

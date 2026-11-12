@@ -1,14 +1,15 @@
 import { cacheLife, cacheTag } from "next/cache";
-import { getSupabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase/public";
 import type { CategoryRow, ProductRow, ProductVariantRow } from "@/types/database";
 import type { Category, Product, ProductVariant } from "@/types/store";
+import { ONE_SIZE_LABEL, parseSizeStocks } from "@/lib/inventory";
 
 /**
  * Data access layer — reads the catalog from Supabase.
  *
  * Results are cached for a minute (`cacheLife("minutes")`) and tagged
- * `catalog`, so the future /admin panel can refresh the store instantly
- * after saving with `updateTag(CATALOG_TAG)`.
+ * `catalog`: the /admin server actions call `updateTag(CATALOG_TAG)` after
+ * every write so the store reflects changes on the next request.
  */
 
 export const CATALOG_TAG = "catalog";
@@ -20,7 +21,7 @@ export interface Catalog {
 
 // ─── Row → domain mappers ────────────────────────────────────────────────────
 
-function toCategory(row: CategoryRow): Category {
+export function toCategory(row: CategoryRow): Category {
   return { id: row.id, slug: row.slug, name: row.name, sortOrder: row.sort_order };
 }
 
@@ -33,13 +34,19 @@ function toVariant(row: ProductVariantRow): ProductVariant {
     hexColor: row.hex_color,
     imageUrl: row.image_url,
     gallery: row.gallery ?? [],
+    // `size_stocks` is missing until the Phase 3 migration runs: sell the
+    // color as one-size with its total stock instead of showing it sold out.
+    sizeStocks:
+      row.size_stocks === undefined
+        ? [{ size: ONE_SIZE_LABEL, stock: row.stock }]
+        : parseSizeStocks(row.size_stocks),
     stock: row.stock,
     priceOverride: row.price_override,
     sortOrder: row.sort_order,
   };
 }
 
-function toProduct(row: ProductRow & { variants: ProductVariantRow[] }): Product {
+export function toProduct(row: ProductRow & { variants: ProductVariantRow[] }): Product {
   return {
     id: row.id,
     slug: row.slug,
@@ -50,7 +57,6 @@ function toProduct(row: ProductRow & { variants: ProductVariantRow[] }): Product
     price: row.price,
     compareAtPrice: row.compare_at_price,
     badge: row.badge,
-    sizes: row.sizes ?? [],
     isActive: row.is_active,
     sortOrder: row.sort_order,
     createdAt: row.created_at,
