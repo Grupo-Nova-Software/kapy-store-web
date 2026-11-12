@@ -13,6 +13,8 @@
   --animate-sheet-up: sheet-up 320ms cubic-bezier(0.32, 0.72, 0, 1);
   --animate-slide-in-right: slide-in-right 320ms cubic-bezier(0.32, 0.72, 0, 1);
   --animate-pop: pop 300ms ease-out;
+  --animate-shake: shake 400ms ease-in-out;
+  --animate-shimmer: shimmer 1.4s ease-in-out infinite;
 
   @keyframes fade-in {
     from { opacity: 0; }
@@ -25,6 +27,15 @@
   @keyframes slide-in-right {
     from { transform: translateX(100%); }
     to { transform: translateX(0); }
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-6px); }
+    40%, 80% { transform: translateX(6px); }
+  }
+  @keyframes shimmer {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
   }
   @keyframes pop {
     0% { transform: scale(1); }
@@ -46,4 +57,12 @@
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
 }

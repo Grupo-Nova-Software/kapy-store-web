@@ -19,7 +19,7 @@ interface CatalogViewProps {
   categories: Category[];
 }
 
-/** Lowercase + strip accents so "jordan" matches "Jórdan", "auricular" matches "Auriculares". */
+/** Lowercase + strip accents so "cancion" matches "canción", "auricular" matches "Auriculares". */
 const normalize = (text: string) =>
   text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 
@@ -48,15 +48,10 @@ export function CatalogView({ products, categories }: CatalogViewProps) {
   }, [products, categories, query]);
 
   const counts = useMemo(() => {
-    const result: Record<CategoryFilterValue, number> = {
-      todos: searched.length,
-      calzados: 0,
-      auriculares: 0,
-      accesorios: 0,
-    };
+    const result: Partial<Record<CategoryFilterValue, number>> = { todos: searched.length };
     for (const p of searched) {
       const slug = slugById.get(p.categoryId);
-      if (slug) result[slug] += 1;
+      if (slug) result[slug] = (result[slug] ?? 0) + 1;
     }
     return result;
   }, [searched, slugById]);

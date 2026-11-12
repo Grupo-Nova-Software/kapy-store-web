@@ -1,16 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type MouseEvent } from "react";
 import Image from "next/image";
 import { ShoppingBag, Truck } from "lucide-react";
 import type { Product, ProductVariant } from "@/types/store";
-import { cartKey, cn, formatGs, variantPrice } from "@/lib/utils";
+import { cartKey, cn, formatGs, hasSizes, variantPrice } from "@/lib/utils";
 import { orderToWhatsAppUrl } from "@/lib/whatsapp";
-import { useCartStore } from "@/store/cart-store";
+import { selectVariantQuantity, useCartStore } from "@/store/cart-store";
 import { Sheet } from "@/components/ui/sheet";
 import { QuantityStepper } from "@/components/ui/quantity-stepper";
 import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
 import { ColorSwatches } from "@/components/catalog/color-swatches";
+import { SizeSelector } from "@/components/catalog/size-selector";
 import { StockLabel } from "@/components/catalog/stock-label";
 
 export interface ProductSelection {
@@ -28,7 +29,7 @@ export function ProductDetailSheet({ selection, onClose }: ProductDetailSheetPro
     <Sheet open={selection !== null} onClose={onClose} label={selection?.product.name ?? "Producto"}>
       {selection && (
         <ProductDetail
-          // Fresh state (variant, photo, qty) every time a product is opened.
+          // Fresh state (variant, size, photo, qty) every time a product is opened.
           key={`${selection.product.id}:${selection.variant.id}`}
           product={selection.product}
           initialVariant={selection.variant}
@@ -49,14 +50,20 @@ function ProductDetail({
   onClose: () => void;
 }) {
   const [variant, setVariant] = useState(initialVariant);
+  const [size, setSize] = useState<string | null>(null);
+  /** Times the user tried to continue without a size (re-triggers the shake). */
+  const [missingSizeAttempts, setMissingSizeAttempts] = useState(0);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
+  const sizesRef = useRef<HTMLDivElement>(null);
 
-  const key = cartKey(product.id, variant.id);
   const addItem = useCartStore((s) => s.addItem);
   const openCart = useCartStore((s) => s.openCart);
-  const inCart = useCartStore((s) => s.items.find((i) => i.key === key)?.quantity ?? 0);
+  const inCart = useCartStore(selectVariantQuantity(variant.id));
 
+  const sizes = product.sizes ?? [];
+  const needsSize = hasSizes(product);
+  const sizeMissing = needsSize && size === null;
   const photos = [variant.imageUrl, ...variant.gallery];
   const price = variantPrice(product, variant);
   const available = Math.max(variant.stock - inCart, 0);
@@ -69,12 +76,24 @@ function ProductDetail({
     setQuantity(1);
   };
 
+  /** Returns false (and asks for the size) when one is required but missing. */
+  const ensureSize = (): boolean => {
+    if (!sizeMissing) return true;
+    setMissingSizeAttempts((n) => n + 1);
+    sizesRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    sizesRef.current?.focus({ preventScroll: true });
+    return false;
+  };
+
   const addToCart = () => {
+    if (!ensureSize()) return;
+    const chosenSize = needsSize ? size : null;
     const added = addItem(
       {
-        key,
+        key: cartKey(product.id, variant.id, chosenSize),
         productId: product.id,
         variantId: variant.id,
+        size: chosenSize,
         name: product.name,
         colorName: variant.colorName,
         hexColor: variant.hexColor,
@@ -90,8 +109,18 @@ function ProductDetail({
     }
   };
 
+  const onWhatsAppClick = (e: MouseEvent<HTMLAnchorElement>) => {
+    if (!ensureSize()) e.preventDefault();
+  };
+
   const whatsappUrl = orderToWhatsAppUrl([
-    { name: product.name, colorName: variant.colorName, quantity: qty, unitPrice: price },
+    {
+      name: product.name,
+      colorName: variant.colorName,
+      size: needsSize ? size : null,
+      quantity: qty,
+      unitPrice: price,
+    },
   ]);
 
   return (
@@ -162,6 +191,31 @@ function ProductDetail({
           />
         </div>
 
+        {needsSize ? (
+          <div>
+            <p className="mb-2.5 text-sm">
+              <span className="text-zinc-500">Talle (EUR): </span>
+              <span className={cn("font-semibold", !size && "text-zinc-400")}>
+                {size ?? "Elegí uno"}
+              </span>
+            </p>
+            <SizeSelector
+              key={missingSizeAttempts}
+              ref={sizesRef}
+              sizes={sizes}
+              value={size}
+              onChange={setSize}
+              invalid={missingSizeAttempts > 0 && sizeMissing}
+              disabled={!canBuy}
+            />
+          </div>
+        ) : (
+          <p className="text-sm">
+            <span className="text-zinc-500">Talle: </span>
+            <span className="font-semibold">Único</span>
+          </p>
+        )}
+
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold">Cantidad</p>
@@ -194,6 +248,7 @@ function ProductDetail({
           </button>
           <a
             href={canBuy ? whatsappUrl : undefined}
+            onClick={onWhatsAppClick}
             target="_blank"
             rel="noopener noreferrer"
             aria-disabled={!canBuy}

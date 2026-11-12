@@ -31,6 +31,18 @@ export function defaultVariant(product: Product): ProductVariant {
   return product.variants.find((v) => v.stock > 0) ?? product.variants[0];
 }
 
-export function cartKey(productId: string, variantId: string): string {
-  return `${productId}:${variantId}`;
+export const ONE_SIZE_LABEL = "Único";
+
+export function hasSizes(product: Product): boolean {
+  return (product.sizes?.length ?? 0) > 0;
+}
+
+/** "39 al 44" for the card hint. Assumes sizes are stored in display order. */
+export function sizeRange(sizes: string[]): string {
+  if (sizes.length <= 1) return sizes[0] ?? ONE_SIZE_LABEL;
+  return `${sizes[0]} al ${sizes[sizes.length - 1]}`;
+}
+
+export function cartKey(productId: string, variantId: string, size: string | null): string {
+  return `${productId}:${variantId}:${size ?? "unico"}`;
 }

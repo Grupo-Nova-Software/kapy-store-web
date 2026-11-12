@@ -11,13 +11,14 @@
 /** ISO-8601 timestamp string (`timestamptz` in Postgres). */
 export type Timestamp = string;
 
-/** Identifier (`uuid` in Postgres). Mock data uses readable strings. */
+/** Identifier (`uuid` in Postgres). */
 export type Id = string;
 
-/** Amount in Paraguayan Guaraníes. PYG has no decimals → `integer`/`bigint`. */
+/** Amount in Paraguayan Guaraníes. PYG has no decimals → `integer`. */
 export type Guaranies = number;
 
-export type CategorySlug = "calzados" | "auriculares" | "accesorios";
+/** Known slugs get a dedicated icon; the admin can create others. */
+export type CategorySlug = "calzados" | "auriculares" | "accesorios" | (string & {});
 
 /** Table `categories`. */
 export interface Category {
@@ -40,7 +41,7 @@ export interface ProductVariant {
   gallery: string[]; // text[] DEFAULT '{}'
   stock: number; // int NOT NULL CHECK (stock >= 0)
   /** Overrides the product price for this variant when set. */
-  priceOverride: Guaranies | null; // bigint NULL
+  priceOverride: Guaranies | null; // integer NULL
   sortOrder: number; // int DEFAULT 0
 }
 
@@ -52,11 +53,18 @@ export interface Product {
   brand: string; // text
   description: string; // text
   categoryId: Id; // uuid FK → categories.id
-  price: Guaranies; // bigint NOT NULL
+  price: Guaranies; // integer NOT NULL
   /** Previous price, shown struck through when > price. */
-  compareAtPrice: Guaranies | null; // bigint NULL
+  compareAtPrice: Guaranies | null; // integer NULL
   badge: string | null; // text NULL — "Nuevo", "Top ventas"…
+  /**
+   * Available sizes, in display order (`text[] DEFAULT '{}'`).
+   * Empty / undefined → one size ("Único"): headphones, accessories.
+   * Stock is tracked per color and shared across sizes.
+   */
+  sizes?: string[];
   isActive: boolean; // bool DEFAULT true
+  sortOrder: number; // int DEFAULT 0
   createdAt: Timestamp; // timestamptz DEFAULT now()
   updatedAt: Timestamp; // timestamptz DEFAULT now()
   /** Joined relation (`select *, variants:product_variants(*)`). */
@@ -65,16 +73,18 @@ export interface Product {
 
 /** Line stored in the cart. Snapshot of the data needed to render & checkout. */
 export interface CartItem {
-  /** `${productId}:${variantId}` */
+  /** `${productId}:${variantId}:${size}` — one line per color + size. */
   key: string;
   productId: Id;
   variantId: Id;
+  /** Chosen size, or `null` for one-size products. */
+  size: string | null;
   name: string;
   colorName: string;
   hexColor: string;
   imageUrl: string;
   unitPrice: Guaranies;
   quantity: number;
-  /** Stock at the moment it was added; caps the quantity. */
+  /** Color stock when added; caps the sum of all sizes of this variant. */
   maxStock: number;
 }

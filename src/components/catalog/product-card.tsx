@@ -2,11 +2,20 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import type { Product, ProductVariant } from "@/types/store";
-import { cartKey, cn, defaultVariant, formatGs, variantPrice } from "@/lib/utils";
-import { useCartStore } from "@/store/cart-store";
+import {
+  cartKey,
+  cn,
+  defaultVariant,
+  formatGs,
+  hasSizes,
+  sizeRange,
+  variantPrice,
+} from "@/lib/utils";
+import { selectVariantQuantity, useCartStore } from "@/store/cart-store";
 import { ColorSwatches } from "@/components/catalog/color-swatches";
+import { SizeSelector } from "@/components/catalog/size-selector";
 import { StockLabel } from "@/components/catalog/stock-label";
 
 interface ProductCardProps {
@@ -21,12 +30,14 @@ const IMAGE_SIZES = "(min-width: 1280px) 22vw, (min-width: 768px) 30vw, 50vw";
 export function ProductCard({ product, priority, onOpen }: ProductCardProps) {
   const [active, setActive] = useState<ProductVariant>(() => defaultVariant(product));
   const [preview, setPreview] = useState<ProductVariant | null>(null);
+  /** Inline size picker opened by the "+" button on products with sizes. */
+  const [pickingSize, setPickingSize] = useState(false);
   const addItem = useCartStore((s) => s.addItem);
   const openCart = useCartStore((s) => s.openCart);
-  const inCart = useCartStore(
-    (s) => s.items.find((i) => i.key === cartKey(product.id, active.id))?.quantity ?? 0,
-  );
+  const inCart = useCartStore(selectVariantQuantity(active.id));
 
+  const sizes = product.sizes ?? [];
+  const needsSize = hasSizes(product);
   const shown = preview ?? active;
   const secondary = shown.gallery[0];
   const price = variantPrice(product, active);
@@ -36,11 +47,12 @@ export function ProductCard({ product, priority, onOpen }: ProductCardProps) {
       ? Math.round((1 - price / product.compareAtPrice) * 100)
       : 0;
 
-  const quickAdd = () => {
+  const add = (size: string | null) => {
     const added = addItem({
-      key: cartKey(product.id, active.id),
+      key: cartKey(product.id, active.id, size),
       productId: product.id,
       variantId: active.id,
+      size,
       name: product.name,
       colorName: active.colorName,
       hexColor: active.hexColor,
@@ -48,11 +60,17 @@ export function ProductCard({ product, priority, onOpen }: ProductCardProps) {
       unitPrice: price,
       maxStock: active.stock,
     });
+    setPickingSize(false);
     if (added) openCart();
   };
 
+  const selectColor = (variant: ProductVariant) => {
+    setActive(variant);
+    setPickingSize(false);
+  };
+
   return (
-    <article className="flex w-full flex-col overflow-hidden rounded-3xl bg-white ring-1 ring-zinc-200/80 transition hover:shadow-xl hover:shadow-zinc-900/5 dark:bg-zinc-900 dark:ring-zinc-800 dark:hover:shadow-black/30">
+    <article className="relative flex w-full flex-col overflow-hidden rounded-3xl bg-white ring-1 ring-zinc-200/80 transition hover:shadow-xl hover:shadow-zinc-900/5 dark:bg-zinc-900 dark:ring-zinc-800 dark:hover:shadow-black/30">
       <button
         type="button"
         onClick={() => onOpen(product, active)}
@@ -105,7 +123,7 @@ export function ProductCard({ product, priority, onOpen }: ProductCardProps) {
           <ColorSwatches
             variants={product.variants}
             activeId={active.id}
-            onSelect={setActive}
+            onSelect={selectColor}
             onPreview={setPreview}
           />
           <span className="hidden text-[11px] text-zinc-500 sm:block">
@@ -120,6 +138,9 @@ export function ProductCard({ product, priority, onOpen }: ProductCardProps) {
           <h3 className="line-clamp-2 text-sm leading-snug font-semibold sm:text-base">
             {product.name}
           </h3>
+          <p className="mt-0.5 text-[11px] text-zinc-500">
+            {needsSize ? `Talles ${sizeRange(sizes)}` : "Talle único"}
+          </p>
         </button>
 
         <StockLabel stock={active.stock} />
@@ -137,15 +158,41 @@ export function ProductCard({ product, priority, onOpen }: ProductCardProps) {
           </div>
           <button
             type="button"
-            onClick={quickAdd}
+            onClick={() => (needsSize ? setPickingSize(true) : add(null))}
             disabled={!canQuickAdd}
             aria-label={`Agregar ${product.name} ${active.colorName} al carrito`}
+            aria-expanded={needsSize ? pickingSize : undefined}
             className="grid size-10 shrink-0 place-items-center rounded-full bg-red-600 text-white shadow-lg shadow-red-600/25 transition hover:bg-red-700 active:scale-95 disabled:bg-zinc-200 disabled:text-zinc-400 disabled:shadow-none dark:disabled:bg-zinc-800 dark:disabled:text-zinc-600"
           >
             <Plus className="size-5" />
           </button>
         </div>
       </div>
+
+      {pickingSize && (
+        <div
+          role="dialog"
+          aria-label={`Elegí tu talle de ${product.name}`}
+          onKeyDown={(e) => e.key === "Escape" && setPickingSize(false)}
+          className="absolute inset-x-0 bottom-0 z-10 animate-sheet-up rounded-t-3xl bg-white/95 p-3 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] backdrop-blur-md sm:p-4 dark:bg-zinc-900/95"
+        >
+          <div className="mb-2.5 flex items-center justify-between gap-2">
+            <p className="min-w-0 truncate text-sm font-bold">
+              Elegí tu talle
+              <span className="font-normal text-zinc-500"> · {active.colorName}</span>
+            </p>
+            <button
+              type="button"
+              onClick={() => setPickingSize(false)}
+              aria-label="Cerrar selector de talle"
+              className="grid size-7 shrink-0 place-items-center rounded-full text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+          <SizeSelector sizes={sizes} value={null} onChange={add} size="sm" />
+        </div>
+      )}
     </article>
   );
 }

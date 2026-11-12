@@ -1,12 +1,12 @@
 "use client";
 
-import { Footprints, Headphones, LayoutGrid, Watch, type LucideIcon } from "lucide-react";
+import { Footprints, Headphones, LayoutGrid, Tag, Watch, type LucideIcon } from "lucide-react";
 import type { Category, CategorySlug } from "@/types/store";
 import { cn } from "@/lib/utils";
 
 export type CategoryFilterValue = CategorySlug | "todos";
 
-const ICONS: Record<CategoryFilterValue, LucideIcon> = {
+const ICONS: Partial<Record<CategoryFilterValue, LucideIcon>> = {
   todos: LayoutGrid,
   calzados: Footprints,
   auriculares: Headphones,
@@ -16,7 +16,8 @@ const ICONS: Record<CategoryFilterValue, LucideIcon> = {
 interface CategoryFilterProps {
   categories: Category[];
   value: CategoryFilterValue;
-  counts: Record<CategoryFilterValue, number>;
+  /** Products per filter value; missing keys count as 0. */
+  counts: Partial<Record<CategoryFilterValue, number>>;
   onChange: (value: CategoryFilterValue) => void;
 }
 
@@ -30,7 +31,7 @@ export function CategoryFilter({ categories, value, counts, onChange }: Category
     <nav aria-label="Categorías" className="-mx-4 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:px-0">
       <ul className="flex w-max gap-2">
         {options.map((opt) => {
-          const Icon = ICONS[opt.value];
+          const Icon = ICONS[opt.value] ?? Tag;
           const active = opt.value === value;
           return (
             <li key={opt.value}>
@@ -53,7 +54,7 @@ export function CategoryFilter({ categories, value, counts, onChange }: Category
                     active ? "bg-white/20" : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800",
                   )}
                 >
-                  {counts[opt.value]}
+                  {counts[opt.value] ?? 0}
                 </span>
               </button>
             </li>
