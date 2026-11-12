@@ -1,18 +1,11 @@
 "use client";
 
-import { Footprints, Headphones, LayoutGrid, Shirt, Tag, Watch, type LucideIcon } from "lucide-react";
+import { LayoutGrid } from "lucide-react";
 import type { Category, CategorySlug } from "@/types/store";
 import { cn } from "@/lib/utils";
+import { CategoryIcon } from "@/components/catalog/category-icon";
 
 export type CategoryFilterValue = CategorySlug | "todos";
-
-const ICONS: Partial<Record<CategoryFilterValue, LucideIcon>> = {
-  todos: LayoutGrid,
-  calzados: Footprints,
-  auriculares: Headphones,
-  accesorios: Watch,
-  ropa: Shirt,
-};
 
 interface CategoryFilterProps {
   categories: Category[];
@@ -23,16 +16,15 @@ interface CategoryFilterProps {
 }
 
 export function CategoryFilter({ categories, value, counts, onChange }: CategoryFilterProps) {
-  const options: { value: CategoryFilterValue; label: string }[] = [
+  const options: { value: CategoryFilterValue; label: string; category?: Category }[] = [
     { value: "todos", label: "Todos" },
-    ...categories.map((c) => ({ value: c.slug, label: c.name })),
+    ...categories.map((c) => ({ value: c.slug, label: c.name, category: c })),
   ];
 
   return (
     <nav aria-label="Categorías" className="-mx-4 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:px-0">
       <ul className="flex w-max gap-2">
         {options.map((opt) => {
-          const Icon = ICONS[opt.value] ?? Tag;
           const active = opt.value === value;
           return (
             <li key={opt.value}>
@@ -47,7 +39,11 @@ export function CategoryFilter({ categories, value, counts, onChange }: Category
                     : "bg-white text-zinc-700 ring-1 ring-zinc-200 hover:ring-sky-600 dark:bg-zinc-900 dark:text-zinc-300 dark:ring-zinc-800",
                 )}
               >
-                <Icon className="size-4" aria-hidden />
+                {opt.category ? (
+                  <CategoryIcon category={opt.category} />
+                ) : (
+                  <LayoutGrid className="size-4" aria-hidden />
+                )}
                 {opt.label}
                 <span
                   className={cn(

@@ -11,6 +11,7 @@ import { productImagesPublicPrefix, PRODUCT_IMAGES_BUCKET } from "@/lib/supabase
 import { randomSuffix, slugify } from "@/lib/slug";
 import type { ActionResult, ColorInput, ProductInput } from "@/lib/admin/types";
 import type { SizeStock } from "@/types/store";
+import { isCategoryIconKey } from "@/lib/category-icons";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -116,10 +117,29 @@ export async function logout(): Promise<void> {
 
 // ─── Categories ──────────────────────────────────────────────────────────────
 
-export async function createCategory(name: string): Promise<ActionResult> {
+/**
+ * A category icon is a built-in key ("shirt") or an icon the admin uploaded to
+ * our bucket (`categories/…`). Anything else is rejected.
+ */
+function cleanIcon(value: unknown): { ok: true; icon: string | null } | { ok: false } {
+  if (value === null || value === undefined || value === "") return { ok: true, icon: null };
+  if (typeof value !== "string" || value.length > 500) return { ok: false };
+  if (isCategoryIconKey(value)) return { ok: true, icon: value };
+  const path = storagePath(value);
+  return path?.startsWith("categories/") ? { ok: true, icon: value } : { ok: false };
+}
+
+/** DB without the icons migration → PostgREST "column not found". */
+const missingIconColumn = (error: DbError) => error.code === "PGRST204" || /\bicon\b/.test(error.message);
+const ICON_MIGRATION_HINT =
+  "Falta la columna de íconos: ejecutá supabase/migrations/20261113_categorias_iconos.sql en Supabase.";
+
+export async function createCategory(name: string, icon: string | null = null): Promise<ActionResult> {
   const session = await requireAdmin();
   const clean = cleanText(name, 60);
   if (!clean) return { ok: false, error: "Escribí un nombre para la categoría." };
+  const iconCheck = cleanIcon(icon);
+  if (!iconCheck.ok) return { ok: false, error: "Ícono inválido." };
 
   const { data: last } = await session.supabase
     .from("categories")
@@ -132,8 +152,12 @@ export async function createCategory(name: string): Promise<ActionResult> {
     name: clean,
     slug: await uniqueSlug(session, "categories", slugify(clean)),
     sort_order: (last?.sort_order ?? 0) + 1,
+    ...(iconCheck.icon ? { icon: iconCheck.icon } : {}),
   });
-  if (error) return { ok: false, error: friendly(error, "No se pudo crear la categoría") };
+  if (error) {
+    if (iconCheck.icon && missingIconColumn(error)) return { ok: false, error: ICON_MIGRATION_HINT };
+    return { ok: false, error: friendly(error, "No se pudo crear la categoría") };
+  }
 
   catalogChanged();
   refresh();
@@ -154,6 +178,25 @@ export async function renameCategory(id: string, name: string): Promise<ActionRe
   return { ok: true };
 }
 
+export async function setCategoryIcon(id: string, icon: string | null): Promise<ActionResult> {
+  const session = await requireAdmin();
+  const iconCheck = cleanIcon(icon);
+  if (!iconCheck.ok) return { ok: false, error: "Ícono inválido." };
+
+  const { data: current } = await session.supabase.from("categories").select("icon").eq("id", id).maybeSingle();
+  const { error } = await session.supabase.from("categories").update({ icon: iconCheck.icon }).eq("id", id);
+  if (error) {
+    if (missingIconColumn(error)) return { ok: false, error: ICON_MIGRATION_HINT };
+    return { ok: false, error: friendly(error, "No se pudo cambiar el ícono") };
+  }
+  // The previous uploaded icon is no longer used.
+  if (current?.icon && current.icon !== iconCheck.icon) await removeImages(session, [current.icon]);
+
+  catalogChanged();
+  refresh();
+  return { ok: true };
+}
+
 export async function deleteCategory(id: string): Promise<ActionResult> {
   const session = await requireAdmin();
 
@@ -168,8 +211,10 @@ export async function deleteCategory(id: string): Promise<ActionResult> {
     };
   }
 
-  const { error } = await session.supabase.from("categories").delete().eq("id", id);
+  const { data: deleted, error } = await session.supabase.from("categories").delete().eq("id", id).select("*");
   if (error) return { ok: false, error: friendly(error, "No se pudo borrar la categoría") };
+  const uploadedIcons = (deleted ?? []).flatMap((row) => (row.icon ? [row.icon] : []));
+  await removeImages(session, uploadedIcons);
 
   catalogChanged();
   refresh();

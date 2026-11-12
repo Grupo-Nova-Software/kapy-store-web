@@ -49,6 +49,10 @@ create table if not exists public.categories (
   name        text not null,
   slug        text not null unique check (slug ~ '^[a-z0-9-]+$'),
   sort_order  integer not null default 0,
+  -- Clave de ícono del panel ("shirt") o URL pública de un ícono subido.
+  icon        text check (
+    icon is null or icon ~ '^[a-z0-9-]{1,40}$' or (icon ~ '^https://' and length(icon) <= 500)
+  ),
   created_at  timestamptz not null default now()
 );
 
@@ -95,6 +99,8 @@ create index if not exists product_variants_product_id_idx on public.product_var
 -- Bases creadas antes de la Fase 3 (create table if not exists no agrega columnas).
 alter table public.product_variants
   add column if not exists size_stocks jsonb not null default '[]'::jsonb;
+alter table public.categories
+  add column if not exists icon text;
 
 -- ─── Stock por talle: validación + total automático ─────────────────────────
 
@@ -295,11 +301,11 @@ create policy "product-images: borrado admin" on storage.objects
 -- image_url / gallery por la URL pública de Storage.
 -- ═══════════════════════════════════════════════════════════════════════════
 
-insert into public.categories (name, slug, sort_order) values
-  ('Calzados',    'calzados',    1),
-  ('Auriculares', 'auriculares', 2),
-  ('Accesorios',  'accesorios',  3),
-  ('Ropa',        'ropa',        4)
+insert into public.categories (name, slug, sort_order, icon) values
+  ('Calzados',    'calzados',    1, 'footprints'),
+  ('Auriculares', 'auriculares', 2, 'headphones'),
+  ('Accesorios',  'accesorios',  3, 'watch'),
+  ('Ropa',        'ropa',        4, 'shirt')
 on conflict (slug) do nothing;
 
 insert into public.products

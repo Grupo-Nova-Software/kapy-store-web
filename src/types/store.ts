@@ -26,6 +26,8 @@ export interface Category {
   slug: CategorySlug; // text UNIQUE
   name: string; // text NOT NULL
   sortOrder: number; // int DEFAULT 0
+  /** Built-in icon key ("shirt") or public URL of an uploaded icon; null → default by slug. */
+  icon: string | null; // text NULL
 }
 
 /** One size of one color with its own stock (`product_variants.size_stocks[]`). */

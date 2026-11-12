@@ -22,7 +22,8 @@ export interface Catalog {
 // ─── Row → domain mappers ────────────────────────────────────────────────────
 
 export function toCategory(row: CategoryRow): Category {
-  return { id: row.id, slug: row.slug, name: row.name, sortOrder: row.sort_order };
+  // `icon ?? null`: tolerate a DB where the icons migration is not applied yet.
+  return { id: row.id, slug: row.slug, name: row.name, sortOrder: row.sort_order, icon: row.icon ?? null };
 }
 
 function toVariant(row: ProductVariantRow): ProductVariant {

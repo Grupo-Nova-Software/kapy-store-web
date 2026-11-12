@@ -51,6 +51,32 @@ const PRESET_COLORS: { name: string; hex: string }[] = [
   { name: "Violeta", hex: "#8B5CF6" },
 ];
 
+const PRESET_NAMES = new Set(PRESET_COLORS.map((p) => p.name.toLowerCase()));
+
+/**
+ * True when the name was filled in by a preset tone (or is empty), so picking
+ * another tone may replace it. Names the owner typed ("Chicago") are kept.
+ */
+const isAutoColorName = (name: string) => !name.trim() || PRESET_NAMES.has(name.trim().toLowerCase());
+
+const hexToRgb = (hex: string) => {
+  const n = Number.parseInt(hex.replace("#", ""), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+};
+
+/** Closest preset name for a custom tone picked with the color wheel. */
+function nearestPresetName(hex: string): string {
+  const [r, g, b] = hexToRgb(hex);
+  let best = PRESET_COLORS[0];
+  let bestDistance = Infinity;
+  for (const p of PRESET_COLORS) {
+    const [pr, pg, pb] = hexToRgb(p.hex);
+    const distance = (r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2;
+    if (distance < bestDistance) [best, bestDistance] = [p, distance];
+  }
+  return best.name;
+}
+
 const SHOE_SIZES = ["35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45"];
 const CLOTHING_SIZES = ["XS", "S", "M", "L", "XL", "XXL"];
 
@@ -207,7 +233,7 @@ export function ColorEditor({ index, color, previous, categorySlug, onChange, on
                 onChange={(e) => onChange({ colorName: e.target.value })}
                 maxLength={40}
                 placeholder="Ej: Negro, Chicago, Verde oliva"
-                className="h-12 w-full rounded-2xl bg-zinc-50 px-4 text-base ring-1 ring-zinc-200 outline-none focus:bg-white focus:ring-2 focus:ring-sky-600 dark:bg-zinc-950 dark:ring-zinc-800"
+                className="h-12 w-full rounded-2xl bg-zinc-50 px-4 text-base ring-1 ring-zinc-200 outline-none text-zinc-900 focus:bg-white focus:ring-2 focus:ring-sky-600 dark:bg-zinc-950 dark:text-zinc-50 dark:ring-zinc-800 dark:focus:bg-zinc-900"
               />
             </label>
             <label className="relative block size-12 shrink-0 cursor-pointer overflow-hidden rounded-full ring-2 ring-zinc-200 dark:ring-zinc-700">
@@ -216,7 +242,13 @@ export function ColorEditor({ index, color, previous, categorySlug, onChange, on
               <input
                 type="color"
                 value={color.hexColor.toLowerCase()}
-                onChange={(e) => onChange({ hexColor: e.target.value.toUpperCase() })}
+                onChange={(e) => {
+                  const hex = e.target.value.toUpperCase();
+                  onChange((c) => ({
+                    hexColor: hex,
+                    colorName: isAutoColorName(c.colorName) ? nearestPresetName(hex) : c.colorName,
+                  }));
+                }}
                 className="absolute inset-0 size-full cursor-pointer opacity-0"
               />
             </label>
@@ -235,8 +267,8 @@ export function ColorEditor({ index, color, previous, categorySlug, onChange, on
                     onClick={() =>
                       onChange((c) => ({
                         hexColor: p.hex,
-                        // Name it automatically if the owner hasn't typed one.
-                        colorName: c.colorName.trim() ? c.colorName : p.name,
+                        // Follow the tone unless the owner typed a custom name.
+                        colorName: isAutoColorName(c.colorName) ? p.name : c.colorName,
                       }))
                     }
                     className={cn(

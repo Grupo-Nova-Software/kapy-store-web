@@ -14,7 +14,7 @@ import {
   sizeRangeLabel,
   sizeStockOf,
 } from "@/lib/inventory";
-import { lineQuantity, useCartStore } from "@/store/cart-store";
+import { useCartStore } from "@/store/cart-store";
 import { ColorSwatches } from "@/components/catalog/color-swatches";
 import { SizeSelector } from "@/components/catalog/size-selector";
 import { StockLabel } from "@/components/catalog/stock-label";
@@ -35,14 +35,13 @@ export function ProductCard({ product, priority, onOpen }: ProductCardProps) {
   const [pickingSize, setPickingSize] = useState(false);
   const addItem = useCartStore((s) => s.addItem);
   const openCart = useCartStore((s) => s.openCart);
-  const cartItems = useCartStore((s) => s.items);
 
   const needsSize = !isOneSizeVariant(active);
-  /** Sizes of the active color, minus what is already in the cart. */
-  const sizeOptions = active.sizeStocks.map(({ size, stock }) => ({
-    size,
-    stock: stock - lineQuantity(cartItems, cartKey(product.id, active.id, size)),
-  }));
+  /**
+   * Sizes of the active color with their REAL stock. The cart does not reserve
+   * units: stock only goes down when the admin changes it in the panel.
+   */
+  const sizeOptions = active.sizeStocks;
   const soldOut = isProductSoldOut(product);
   const sizesInStock = productSizesInStock(product);
   const shown = preview ?? active;
@@ -55,7 +54,7 @@ export function ProductCard({ product, priority, onOpen }: ProductCardProps) {
       : 0;
 
   const add = (size: string) => {
-    const added = addItem({
+    addItem({
       key: cartKey(product.id, active.id, size),
       productId: product.id,
       variantId: active.id,
@@ -68,7 +67,9 @@ export function ProductCard({ product, priority, onOpen }: ProductCardProps) {
       maxStock: sizeStockOf(active, size),
     });
     setPickingSize(false);
-    if (added) openCart();
+    // Open the cart even when the line is already at the stock limit, so the
+    // shopper sees the units they have.
+    openCart();
   };
 
   const selectColor = (variant: ProductVariant) => {

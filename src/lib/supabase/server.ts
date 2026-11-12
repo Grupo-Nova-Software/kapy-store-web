@@ -1,5 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { connection } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
@@ -12,6 +13,9 @@ import { supabaseEnv } from "@/lib/supabase/env";
  */
 export async function createSupabaseServerClient(): Promise<SupabaseClient<Database>> {
   const { url, anonKey } = supabaseEnv();
+  // supabase-js reads the clock (Date.now) while loading the session, which
+  // Next forbids during a (runtime) prerender. Run auth only at request time.
+  await connection();
   const cookieStore = await cookies();
 
   return createServerClient<Database>(url, anonKey, {

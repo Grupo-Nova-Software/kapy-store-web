@@ -16,6 +16,7 @@ export type CategoryRow = {
   name: string;
   slug: string;
   sort_order: number;
+  icon: string | null;
   created_at: Timestamptz;
 };
 

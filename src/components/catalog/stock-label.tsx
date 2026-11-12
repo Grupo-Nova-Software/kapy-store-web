@@ -24,7 +24,7 @@ export function StockLabel({ stock, className }: { stock: number; className?: st
         )}
       />
       {state === "ok" && "En stock"}
-      {state === "low" && `¡Últimas ${stock} ${stock === 1 ? "unidad" : "unidades"}!`}
+      {state === "low" && (stock === 1 ? "¡Última unidad!" : `¡Últimas ${stock} unidades!`)}
       {state === "out" && "Sin stock"}
     </span>
   );

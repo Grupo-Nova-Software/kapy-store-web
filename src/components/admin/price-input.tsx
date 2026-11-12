@@ -31,7 +31,7 @@ export function PriceInput({ value, onChange, placeholder, required, className }
           onChange(digits ? Number(digits) : null);
         }}
         className={cn(
-          "h-12 w-full rounded-2xl bg-zinc-50 pr-4 pl-12 text-lg font-bold tabular-nums ring-1 ring-zinc-200 outline-none transition placeholder:font-normal placeholder:text-zinc-400 focus:bg-white focus:ring-2 focus:ring-sky-600 dark:bg-zinc-950 dark:ring-zinc-800",
+          "h-12 w-full rounded-2xl bg-zinc-50 pr-4 pl-12 text-lg font-bold tabular-nums ring-1 ring-zinc-200 outline-none transition placeholder:font-normal placeholder:text-zinc-400 text-zinc-900 focus:bg-white focus:ring-2 focus:ring-sky-600 dark:bg-zinc-950 dark:text-zinc-50 dark:ring-zinc-800 dark:focus:bg-zinc-900",
           className,
         )}
       />

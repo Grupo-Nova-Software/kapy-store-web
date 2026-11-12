@@ -63,11 +63,11 @@ function ProductDetail({
   const cartItems = useCartStore((s) => s.items);
 
   const needsSize = !isOneSizeVariant(variant);
-  /** Sizes offered in THIS color, minus the units already in the cart. */
-  const sizeOptions = variant.sizeStocks.map(({ size: s, stock }) => ({
-    size: s,
-    stock: Math.max(stock - lineQuantity(cartItems, cartKey(product.id, variant.id, s)), 0),
-  }));
+  /**
+   * Sizes offered in THIS color with their REAL stock. The cart does not
+   * reserve units: stock only goes down when the admin changes it.
+   */
+  const sizeOptions = variant.sizeStocks;
   const colorAvailable = sizeOptions.reduce((sum, o) => sum + o.stock, 0);
   // One-size colors need no choice; a picked size that this color lacks is dropped.
   const size = needsSize
@@ -79,7 +79,7 @@ function ProductDetail({
   const photos = [variant.imageUrl, ...variant.gallery];
   const price = variantPrice(product, variant);
   const inCart = size === null ? 0 : lineQuantity(cartItems, cartKey(product.id, variant.id, size));
-  const available = size === null ? colorAvailable : Math.max(sizeStockOf(variant, size) - inCart, 0);
+  const available = size === null ? colorAvailable : sizeStockOf(variant, size);
   const qty = size === null ? 1 : Math.min(quantity, Math.max(available, 1));
   const canBuy = available > 0;
 
@@ -105,7 +105,7 @@ function ProductDetail({
 
   const addToCart = () => {
     if (!ensureSize() || size === null) return;
-    const added = addItem(
+    addItem(
       {
         key: cartKey(product.id, variant.id, size),
         productId: product.id,
@@ -120,10 +120,9 @@ function ProductDetail({
       },
       qty,
     );
-    if (added) {
-      onClose();
-      openCart();
-    }
+    // Even if the line was already at the stock limit, show the cart.
+    onClose();
+    openCart();
   };
 
   const onWhatsAppClick = (e: MouseEvent<HTMLAnchorElement>) => {
@@ -227,9 +226,7 @@ function ProductDetail({
               />
             ) : (
               <p className="rounded-2xl bg-zinc-100 px-4 py-3 text-sm text-zinc-500 dark:bg-zinc-800">
-                {variant.stock > 0
-                  ? "Ya tenés en tu carrito todo el stock de este color."
-                  : "Este color está agotado en todos los talles. Probá con otro color."}
+                Este color está agotado en todos los talles. Probá con otro color.
               </p>
             )}
           </div>
@@ -248,9 +245,7 @@ function ProductDetail({
                 ? "Elegí un talle para ver la disponibilidad"
                 : canBuy
                 ? `${available} disponible${available === 1 ? "" : "s"}${needsSize ? ` en talle ${size}` : ""}${inCart ? ` · ${inCart} en tu carrito` : ""}`
-                : inCart
-                  ? "Ya tenés todo el stock en tu carrito"
-                  : "Sin unidades disponibles"}
+                : "Sin unidades disponibles"}
             </p>
           </div>
           <QuantityStepper

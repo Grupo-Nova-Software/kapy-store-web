@@ -325,7 +325,7 @@ export function ProductForm({ categories, product }: ProductFormProps) {
 // ─── Small form primitives ───────────────────────────────────────────────────
 
 export const inputClass =
-  "h-12 w-full rounded-2xl bg-zinc-50 px-4 text-base ring-1 ring-zinc-200 outline-none transition placeholder:text-zinc-400 focus:bg-white focus:ring-2 focus:ring-sky-600 dark:bg-zinc-950 dark:ring-zinc-800 dark:focus:bg-zinc-950";
+  "h-12 w-full rounded-2xl bg-zinc-50 px-4 text-base ring-1 ring-zinc-200 outline-none transition text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:ring-2 focus:ring-sky-600 dark:bg-zinc-950 dark:text-zinc-50 dark:ring-zinc-800 dark:focus:bg-zinc-950";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
